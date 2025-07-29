@@ -34,6 +34,10 @@ magentaprint "Настройка firewall, открываем 3306 порт"
 firewall-cmd --permanent --add-port=3306/tcp
 firewall-cmd --reload
 
+magentaprint "Создание директории для временных файлов"
+mkdir -p /var/lib/mysql_tmp
+chown mysql:mysql /var/lib/mysql_tmp
+
 magentaprint "Проверяем статус MariaDB"
 sudo systemctl status mariadb --no-pager
 
@@ -59,7 +63,7 @@ socket = /var/lib/mysql/mysql.sock
 datadir = /var/lib/mysql
 
 # Директория для временных файлов (сортировка, временные таблицы)
-tmpdir = /data/mysql_tmp
+tmpdir = /var/lib/mysql_tmp
 
 # Файл общего лога (все запросы, если general_log = ON)
 general-log-file = /var/log/mariadb/mariadb.log
@@ -73,11 +77,16 @@ log_warnings = 2
 # Файл с PID-идентификатором процесса
 pid-file=/run/mariadb/mariadb.pid
 
+# Отключить кэширование DNS-имен (ускоряет подключения)
+skip-host-cache
+# Не разрешать имена хостов (только IP, ускоряет соединения)
+skip-name-resolve
+
 # Время неактивности (в секундах), после которого соединение закрывается
 wait_timeout = 300
 
 # Максимальное количество одновременных подключений
-max_connections = 1000
+max_connections = 100
 
 # Хранить каждую InnoDB-таблицу в отдельном файле (упрощает управление)
 innodb_file_per_table = on
@@ -87,7 +96,7 @@ innodb_file_per_table = on
 # 2 = компромисс (данные сохраняются в ОС, но не обязательно на диск).
 innodb_flush_log_at_trx_commit = 1
 # Размер буфера пула InnoDB (кэш данных и индексов). Обычно 60–80% от объема RAM сервера.
-innodb_buffer_pool_size = 2G
+innodb_buffer_pool_size = 1G
 # Размер файла лога транзакций InnoDB
 innodb_log_file_size = 256M
 # Размер буфера лога транзакций InnoDB
@@ -98,9 +107,9 @@ innodb_flush_method=O_DIRECT
 innodb_file_format = Barracuda
 
 # Размер кэша запросов
-query_cache_size = 64M
+query_cache_size = 0
 # Тип кэша запросов (ON = кэшировать все, кроме SELECT SQL_NO_CACHE)
-query_cache_type = ON
+query_cache_type = 0
 
 # Размер временных таблиц в памяти
 tmp_table_size = 64M
@@ -112,7 +121,6 @@ slow_query_log = on
 long_query_time = 5
 # Файл для записи медленных запросов
 slow_query_log_file = /var/log/mariadb/slow.log
-
 
 # Установка кодировки по умолчанию.
 character-set-server = utf8mb4
