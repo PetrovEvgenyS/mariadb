@@ -48,7 +48,7 @@ magentaprint "Создание пользотеля в СУБД MariaDB и из�
 mysql -u root -pEnter -e "CREATE USER '$USER'@'%' IDENTIFIED BY '$USER_PASSWORD';"
 mysql -u root -pEnter -e "GRANT ALL PRIVILEGES ON *.* TO '$USER'@'%';"
 mysql -u root -pEnter -e "ALTER USER 'root'@'localhost' IDENTIFIED BY '$ROOT_DB_PASSWORD';"
-mysql -u root -pEnter -e "FLUSH PRIVILEGES;"
+mysql -u root -p$ROOT_DB_PASSWORD -e "FLUSH PRIVILEGES;"
 
 magentaprint "Добавляем рекомендуемые параметры тюнинга MariaDB"
 cat <<EOF > $MARIADB_CONF
