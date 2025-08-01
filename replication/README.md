@@ -39,3 +39,57 @@
    sudo ./setup_slave.sh
    ```
 4. Проверьте статус репликации — скрипт выведет результат команды `SHOW SLAVE STATUS\G`.
+
+
+## Проверка состояния репликации
+
+```sql
+SHOW SLAVE STATUS\G;
+```
+либо
+```sql
+SHOW REPLICA STATUS\G;
+```
+
+### Параметры репликации MariaDB
+
+| Поле                              | Что значит                                                                 | Что должно быть                            |
+|-----------------------------------|------------------------------------------------------------------------------|---------------------------------------------|
+| `Slave_IO_Running`                | Поток загрузки бинарных логов с мастера                            	 | `Yes`                                       |
+| `Slave_SQL_Running`              | Поток применения событий из лога на слейве                                  | `Yes`                                       |
+| `Seconds_Behind_Master`          | Задержка реплики в секундах                                                 | `0` или близко к `0`                        |
+| `Last_IO_Error`                  | Последняя ошибка в IO-потоке                                                | Пусто                                       |
+| `Last_SQL_Error`                 | Последняя ошибка в SQL-потоке                                               | Пусто                                       |
+| `Read_Master_Log_Pos`            | Позиция, до которой IO-поток прочитал бинлоги                               | ≈ `Exec_Master_Log_Pos`                     |
+| `Exec_Master_Log_Pos`            | Позиция, до которой SQL-поток применил бинлоги                              | ≈ `Read_Master_Log_Pos`                     |
+| `Master_Log_File`                | Имя текущего бинарного лога на мастере                                      | Совпадает с `Relay_Master_Log_File`         |
+| `Relay_Master_Log_File`          | Лог-файл, который сейчас исполняется                                        | Совпадает с `Master_Log_File`               |
+| `Relay_Log_Space`                | Размер relay-логов на диске                                                 | Не растёт бесконтрольно                     |
+| `Slave_IO_State`                 | Что делает IO-поток сейчас                                                  | `Waiting for master to send event`          |
+| `Slave_SQL_Running_State`        | Что делает SQL-поток сейчас                                                 | `Slave has read all relay log` или idle     |
+| `Last_IO_Errno`, `Last_IO_Error` | Код и текст последней IO-ошибки                                            | `0`, пусто                                   |
+| `Last_SQL_Errno`, `Last_SQL_Error` | Код и текст последней SQL-ошибки                                          | `0`, пусто                                   |
+| `Master_Host`                    | IP или имя мастера                                                          | Соответствует конфигурации                  |
+| `Master_User`                    | Пользователь для подключения к мастеру                                      | Репликационный пользователь (`REPLICATION SLAVE`) |
+| `Master_Port`                    | Порт подключения к мастеру                                                  | `3306` (или ваш кастомный)                  |
+| `Connect_Retry`                  | Интервал повторного подключения (секунды)                                   | Обычно `60`                                 |
+| `Using_Gtid`                     | Используется ли GTID                                                        | `Yes` (если настроено)                      |
+| `Gtid_IO_Pos`                    | Текущая позиция GTID                                                        | Заполнено, если `Using_Gtid = Yes`          |
+| `Auto_Position`                  | Используется ли авто-позиция (GTID)                                         | `1` (если включён GTID)                     |
+| `SQL_Delay`                      | Задержка применения SQL событий                                             | `0` (если не используете отложенную реплику)|
+| `SQL_Remaining_Delay`            | Сколько ещё ждать до применения событий                                     | `NULL` или `0`                              |
+| `Parallel_Mode`                  | Режим параллельного исполнения SQL-потока                                   | `optimistic`, `strict`, или `conservative`  |
+| `Master_Server_Id`              | `server_id` мастера                                                        | Совпадает с ID мастера                      |
+| `Relay_Log_File`    | Имя текущего relay-лога, из которого SQL-поток применяет события            | Обновляется синхронно с `Relay_Master_Log_File`  |
+| `Relay_Log_Pos`     | Текущая позиция чтения внутри `Relay_Log_File`                              | Продвигается вперёд, обычно ≈ `Exec_Master_Log_Pos` |
+
+
+### Быстрый шаблон оценки:
+Если:
+- `Slave_IO_Running: Yes`
+- `Slave_SQL_Running: Yes`
+- `Seconds_Behind_Master: 0`
+- `Last_IO_Error: [пусто]`
+- `Last_SQL_Error: [пусто]`
+
+Всё работает нормально.
