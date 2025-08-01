@@ -43,7 +43,7 @@ echo "$MASTER_STATUS"
 # Делаем резервную копию всех баз:
 echo " "
 echo "Делаем backpup БД: /tmp/master_backup.sql"
-mysqldump -u root -p$ROOT_PASSWORD --all-databases > /tmp/master_backup.sql
+mariadb-dump -u root -p$ROOT_PASSWORD --all-databases > /tmp/master_backup.sql
 
 # Снимаем блокировку БД на запись:
 mysql -u root -p$ROOT_PASSWORD -e "SET GLOBAL read_only = OFF;"
