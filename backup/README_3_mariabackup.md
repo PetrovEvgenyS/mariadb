@@ -21,27 +21,47 @@
 
 ---
 
+## Хранение пароля
+Для безопасности пароль и логин лучше хранить в конфигурационном файле, например `/etc/my.cnf.d/client.cnf`:
+
+```ini
+[client]
+user=ЛОГИН
+password=ПАРОЛЬ
+```
+
+Права на файл:
+```bash
+chmod 600 /etc/my.cnf.d/client.cnf
+```
+
+---
+
 ## Полный бэкап
 
 ```bash
-mariabackup --backup \
-    --target-dir=/backups/full_$(date +%F) \
-    --user=root --password=ПАРОЛЬ
+mariabackup --defaults-file=/etc/my.cnf.d/client.cnf \
+    --backup \
+    --target-dir=/backups/full_$(date +%F)
+
+tar -cf - /backups/full_$(date +%F) | pigz > /backups/full_$(date +%F).tar.gz
 ```
 
+- `-defaults-file` — файл с логином и паролем (учётные данные MariaDB).
 - `--backup` — режим создания копии.
 - `--target-dir` — папка, куда сохранить бэкап.
-- `--user` и `--password` — учётные данные MariaDB.
 
 ---
 
 ## Инкрементальный бэкап
 
 ```bash
-mariabackup --backup \
+mariabackup --defaults-file=/etc/my.cnf.d/client.cnf \
+    --backup \
     --target-dir=/backups/inc_$(date +%F) \
-    --incremental-basedir=/backups/full_2025-08-09 \
-    --user=root --password=ПАРОЛЬ
+    --incremental-basedir=/backups/full_2025-08-09
+
+tar -cf - /backups/inc_$(date +%F) | pigz > /backups/inc_$(date +%F).tar.gz
 ```
 
 - `--incremental-basedir` — путь к базе, от которой берутся изменения.
@@ -49,6 +69,12 @@ mariabackup --backup \
 ---
 
 ## Подготовка бэкапа к восстановлению
+
+Распаковываем:
+
+```bash
+tar -xf /backups/full_2025-08-09.tar.gz -C /backups/
+```
 
 Перед восстановлением нужно «применить» журналы транзакций, чтобы база стала консистентной:
 
