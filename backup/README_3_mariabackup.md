@@ -44,7 +44,7 @@ mariabackup --defaults-file=/etc/my.cnf.d/client.cnf \
     --backup \
     --target-dir=/backups/full_$(date +%F)
 
-tar -cf - /backups/full_$(date +%F) | pigz > /backups/full_$(date +%F).tar.gz
+tar -cf - full_$(date +%F) | pigz > /backups/full_$(date +%F).tar.gz
 ```
 
 - `-defaults-file` — файл с логином и паролем (учётные данные MariaDB).
@@ -61,7 +61,7 @@ mariabackup --defaults-file=/etc/my.cnf.d/client.cnf \
     --target-dir=/backups/inc_$(date +%F) \
     --incremental-basedir=/backups/full_2025-08-09
 
-tar -cf - /backups/inc_$(date +%F) | pigz > /backups/inc_$(date +%F).tar.gz
+tar -cf - inc_$(date +%F) | pigz > /backups/inc_$(date +%F).tar.gz
 ```
 
 - `--incremental-basedir` — путь к базе, от которой берутся изменения.
