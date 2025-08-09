@@ -27,8 +27,8 @@ fi
 magentaprint "Устанавливаем сервер MariaDB и клиент"
 dnf install -y mariadb-server mariadb
 
-magentaprint "Включаем MariaDB в автозагрузку и запускаем"
-systemctl enable mariadb && systemctl start mariadb
+magentaprint "Включаем автозапуск и стартуем MariaDB"
+systemctl enable --now mariadb
 
 magentaprint "Настройка firewall, открываем 3306 порт"
 firewall-cmd --permanent --add-port=3306/tcp
@@ -39,16 +39,24 @@ mkdir -p /var/lib/mysql_tmp
 chown mysql:mysql /var/lib/mysql_tmp
 
 magentaprint "Проверяем статус MariaDB"
-sudo systemctl status mariadb --no-pager
+systemctl status mariadb --no-pager
 
 magentaprint "Проверяем версию MariaDB"
 mariadb --version
 
-magentaprint "Создание пользотеля в СУБД MariaDB и измение пароля root"
-mysql -u root -pEnter -e "CREATE USER '$USER'@'%' IDENTIFIED BY '$USER_PASSWORD';"
-mysql -u root -pEnter -e "GRANT ALL PRIVILEGES ON *.* TO '$USER'@'%';"
-mysql -u root -pEnter -e "ALTER USER 'root'@'localhost' IDENTIFIED BY '$ROOT_DB_PASSWORD';"
-mysql -u root -p$ROOT_DB_PASSWORD -e "FLUSH PRIVILEGES;"
+magentaprint "Создание пользователя и установка пароля root"
+# Подключаемся через сокет (root без пароля)
+mariadb -u root --protocol=SOCKET <<SQL
+CREATE USER IF NOT EXISTS '${USER}'@'%' IDENTIFIED BY '${USER_PASSWORD}';
+GRANT ALL PRIVILEGES ON *.* TO '${USER}'@'%' WITH GRANT OPTION;
+ALTER USER 'root'@'localhost' IDENTIFIED BY '$ROOT_DB_PASSWORD';
+FLUSH PRIVILEGES;
+SQL
+
+magentaprint "Бэкапим текущий конфиг, если существует"
+if [[ -f "${MARIADB_CONF}" ]]; then
+    cp -a "${MARIADB_CONF}" "${MARIADB_CONF}.bak.$(date +%Y%m%d%H%M%S)"
+fi
 
 magentaprint "Добавляем рекомендуемые параметры тюнинга MariaDB"
 cat <<EOF > $MARIADB_CONF
@@ -77,6 +85,7 @@ log_warnings = 2
 # Файл с PID-идентификатором процесса
 pid-file=/run/mariadb/mariadb.pid
 
+## Ускорит резолвинг
 # Отключить кэширование DNS-имен (ускоряет подключения)
 skip-host-cache
 # Не разрешать имена хостов (только IP, ускоряет соединения)
@@ -106,6 +115,7 @@ innodb_flush_method=O_DIRECT
 # Формат файлов InnoDB (Barracuda поддерживает сжатие)
 innodb_file_format = Barracuda
 
+## Query Cache (выключено в новых версиях, оставлено явно)
 # Размер кэша запросов
 query_cache_size = 0
 # Тип кэша запросов (ON = кэшировать все, кроме SELECT SQL_NO_CACHE)
@@ -130,5 +140,6 @@ EOF
 magentaprint "Перезапускаем MariaDB для применения настроек"
 systemctl restart mariadb
 
+magentaprint "Базовая настройка завершена."
 magentaprint "Запустите скрипт, который поможет улучшить безопасность:"
 greenprint "mysql_secure_installation"
