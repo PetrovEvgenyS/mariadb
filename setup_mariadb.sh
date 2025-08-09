@@ -47,19 +47,19 @@ mariadb --version
 magentaprint "Создание пользователя и установка пароля root"
 # Подключаемся через сокет (root без пароля)
 mariadb -u root --protocol=SOCKET <<SQL
-CREATE USER IF NOT EXISTS '${USER}'@'%' IDENTIFIED BY '${USER_PASSWORD}';
-GRANT ALL PRIVILEGES ON *.* TO '${USER}'@'%' WITH GRANT OPTION;
-ALTER USER 'root'@'localhost' IDENTIFIED BY '$ROOT_DB_PASSWORD';
+CREATE USER IF NOT EXISTS '$USER'@'%' IDENTIFIED BY '$USER_PASSWORD';
+GRANT ALL PRIVILEGES ON *.* TO '$USER'@'%' WITH GRANT OPTION;
+ALTER USER 'root'@'localhost' IDENTIFIED VIA mysql_native_password USING PASSWORD('$ROOT_DB_PASSWORD');
 FLUSH PRIVILEGES;
 SQL
 
 magentaprint "Бэкапим текущий конфиг, если существует"
-if [[ -f "${MARIADB_CONF}" ]]; then
-    cp -a "${MARIADB_CONF}" "${MARIADB_CONF}.bak.$(date +%Y%m%d%H%M%S)"
+if [[ -f "$MARIADB_CONF" ]]; then
+    cp -a "$MARIADB_CONF" "${MARIADB_CONF}.bak.$(date +%Y%m%d%H%M%S)"
 fi
 
 magentaprint "Добавляем рекомендуемые параметры тюнинга MariaDB"
-cat <<EOF > $MARIADB_CONF
+cat <<EOF > "$MARIADB_CONF"
 [mysqld]
 # Слушать все сетевые интерфейсы
 bind_address = 0.0.0.0
