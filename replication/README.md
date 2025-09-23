@@ -29,18 +29,27 @@
 
 ### 2. Настройка Slave-сервера
 
-1. Отредактируйте переменные в `setup_slave.sh` (IP мастера, пароли, имя бинарного лога и позицию — используйте значения из мастера).
-2. Восстановите резервную копию базы данных:
+1. Получите резервную копию базы данных с мастера (если ещё не передавали):
+   ```bash
+   scp /tmp/master_backup.sql <USER>@<SLAVE_IP>:/tmp/
+   ```
+
+2. Восстановите резервную копию базы данных на слейве:
    ```bash
    mysql -u root -p < /tmp/master_backup.sql
    ```
-3. Запустите скрипт на слейв-сервере:
+
+3. Отредактируйте переменные в `setup_slave.sh` (IP мастера, пароли, имя бинарного лога и позицию — используйте значения из мастера).
+
+4. Запустите скрипт на слейв-сервере:
    ```bash
    sudo ./setup_slave.sh
    ```
-4. Проверьте статус репликации — скрипт выведет результат команды `SHOW SLAVE STATUS\G`.
 
-
+5. Проверьте статус репликации — скрипт выведет результат команды:
+   ```sql
+   SHOW SLAVE STATUS\G;
+   ```
 ## Проверка состояния репликации
 
 ```sql
@@ -93,3 +102,129 @@ SHOW REPLICA STATUS\G;
 - `Last_SQL_Error: [пусто]`
 
 Всё работает нормально.
+
+
+
+## Переключение ролей при отказе мастера (Failover)
+
+Если мастер недоступен, можно назначить одного из слейвов новым мастером, а старый мастер — подключить к нему как реплику после восстановления.
+
+### 1. Назначение нового мастера
+1. Выбери актуального слейва (у которого `Seconds_Behind_Master = 0` или минимальная задержка).
+2. Останови репликацию на этом слейве:
+   ```sql
+   STOP SLAVE;
+   RESET SLAVE ALL;
+   ```
+3. Включи бинарные логи (обязательно для работы как мастера).  
+   Отредактируй `/etc/my.cnf.d/mariadb-server.cnf`, добавь:
+   ```ini
+   [mysqld]
+   bind-address= 127.0.0.1,10.10.10.2
+   server-id=2
+   log_bin = /var/lib/mysql/mariadb-bin.log
+   log_bin_index = /var/lib/mysql/mariadb-bin.index
+   binlog_ignore_db = information_schema, mysql, performance_schema
+   ```
+   Перезапусти MariaDB:
+   ```bash
+   systemctl restart mariadb
+   ```
+   После этого убедись, что `SHOW MASTER STATUS;` показывает файл binlog и позицию.
+4. Убедись, что сервер может принимать записи:
+   ```sql
+   SET GLOBAL read_only = OFF;
+   ```
+5. Создай на новом мастере пользователя для репликации (если ещё нет):
+   ```sql
+   CREATE USER 'replicator'@'%' IDENTIFIED BY 'Ee123456';
+   GRANT REPLICATION SLAVE ON *.* TO 'replicator'@'%';
+   FLUSH PRIVILEGES;
+   ```
+6. С этого момента новый сервер работает как **Master**.
+
+### 2. Переподключение остальных слейвов к новому мастеру
+1. На каждом слейве останови старую репликацию:
+   ```sql
+   STOP SLAVE;
+   RESET SLAVE ALL;
+   ```
+
+2. Включи бинарные логи (обязательно для работы как мастера).  
+   Отредактируй `/etc/my.cnf.d/mariadb-server.cnf`, добавь:
+   ```ini
+   [mysqld]
+   bind-address= 127.0.0.1,10.10.10.2
+   server-id=2
+   log_bin = /var/lib/mysql/mariadb-bin.log
+   log_bin_index = /var/lib/mysql/mariadb-bin.index
+   binlog_ignore_db = information_schema, mysql, performance_schema
+   ```
+   Перезапусти MariaDB:
+   ```bash
+   systemctl restart mariadb
+   ```
+
+3. Подключи слейв к новому мастеру:
+   ```sql
+   CHANGE MASTER TO
+     MASTER_HOST='<NEW_MASTER_IP>',
+     MASTER_USER='replicator',
+     MASTER_PASSWORD='Ee123456',
+     MASTER_LOG_FILE='<NEW_MASTER_LOG_FILE>',
+     MASTER_LOG_POS=<NEW_MASTER_LOG_POS>;
+   START SLAVE;
+   ```
+3. Проверь состояние:
+   ```sql
+   SHOW SLAVE STATUS\G;
+   ```
+
+### 3. Подключение старого мастера как слейва
+Когда старый мастер восстановлен:
+1. Очисти его от старых настроек репликации:
+   ```sql
+   RESET SLAVE ALL;
+   ```
+
+2. Удали старые данные, чтобы исключить конфликты (можно удалить только пользовательские базы или полностью datadir):
+   ```sql
+   DROP DATABASE IF EXISTS example_db;
+   CREATE DATABASE example_db;
+   ```
+   или радикально (удалить весь datadir и пересоздать):
+   ```bash
+   systemctl stop mariadb
+   rm -rf /var/lib/mysql/*
+   mysql_install_db --user=mysql --basedir=/usr --datadir=/var/lib/mysql
+   systemctl start mariadb
+   ```
+
+3. Перед подключением к новому мастеру **обязательно пересинхронизируй данные**, так как на старом мастере могли остаться записи, которых нет у нового.  
+   Иначе будут ошибки (`Duplicate entry`, `Row not found` и т. д.).  
+   Проще всего сделать полный дамп с нового мастера и восстановить его на старом:
+   ```bash
+   mysqldump -h <NEW_MASTER_IP> -u root -p --all-databases > /tmp/master_dump.sql
+   mysql -u root -p < /tmp/master_dump.sql
+   ```
+
+4. Включи режим `read_only`:
+   ```sql
+   SET GLOBAL read_only = ON;
+   ```
+
+5. Подключи его к новому мастеру:
+   ```sql
+   CHANGE MASTER TO
+     MASTER_HOST='<NEW_MASTER_IP>',
+     MASTER_USER='replicator',
+     MASTER_PASSWORD='Ee123456',
+     MASTER_LOG_FILE='<NEW_MASTER_LOG_FILE>',
+     MASTER_LOG_POS=<NEW_MASTER_LOG_POS>;
+   START SLAVE;
+   ```
+
+6. Убедись, что он синхронизировался:
+   ```sql
+   SHOW SLAVE STATUS\G;
+   ```
