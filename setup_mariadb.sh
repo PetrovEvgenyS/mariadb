@@ -1,9 +1,9 @@
 #!/bin/bash
 
 # Скрипт для установки и настройки MariaDB на AlmaLinux
-ROOT_DB_PASSWORD="Ww12345"  # Пароль от root СУБД MariaDB.
-USER="evgen"                # Имя пользователя, который будет создан в СУБД MariaDB.
-USER_PASSWORD="Xx12345"     # Пароль от $USER СУБД MariaDB.
+ROOT_DB_PASSWORD="your_password"    # Пароль от root СУБД MariaDB.
+USER="evgen"                        # Имя пользователя, который будет создан в СУБД MariaDB.
+USER_PASSWORD="your_password"       # Пароль от $USER СУБД MariaDB.
 MARIADB_CONF="/etc/my.cnf.d/mariadb-server.cnf" # Путь к файлу конфигурации MariaDB.
 
 ### ЦВЕТА ###

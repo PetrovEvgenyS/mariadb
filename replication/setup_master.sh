@@ -2,8 +2,8 @@
 
 # Переменные для конфигурации
 REPLICA_USER="replicator"   # Имя пользователя для репликации
-REPLICA_PASSWORD="Ee123456" # Пароль для пользователя репликации
-ROOT_PASSWORD="Ww12345"     # Пароль пользователя root
+REPLICA_PASSWORD="your_password" # Пароль для пользователя репликации
+ROOT_PASSWORD="your_password"    # Пароль пользователя root
 SLAVE_IP="10.100.10.2"      # IP-адрес slave-сервера
 DATABASE="example_db"       # Имя базы данных для репликации
 MARIADB_CONF="/etc/my.cnf.d/mariadb-server.cnf" # Путь к файлу конфигурации MariaDB.
@@ -15,8 +15,6 @@ server-id = 1               # Уникальный идентификатор м
 
 log_bin = /var/lib/mysql/mariadb-bin.log  # Включает бинарные логи, необходимые для репликации.
 log_bin_index = /var/lib/mysql/mariadb-bin.index # Хранит список всех бинарных файлов, что важно для репликации и восстановления данных.
-
-expire_logs_days = 3   # Устанавливает количество дней, через которое старые бинарные логи (bin_log) будут автоматически удалены.
 
 # binlog_do_db = $DATABASE  # Используется для репликации только определенных баз данных.
 binlog_ignore_db = information_schema, mysql, performance_schema # Исключает определенные базы данных из репликации (в данном примере, исключены служебных базы).

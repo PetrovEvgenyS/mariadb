@@ -2,8 +2,8 @@
 
 # Переменные для конфигурации
 REPLICA_USER="replicator"   # Имя пользователя для репликации
-REPLICA_PASSWORD="Ee123456" # Пароль для пользователя репликации
-ROOT_PASSWORD="Ww12345"     # Пароль пользователя root
+REPLICA_PASSWORD="your_password"  # Пароль для пользователя репликации
+ROOT_PASSWORD="your_password"     # Пароль пользователя root
 MASTER_IP="10.100.10.1"     # IP-адрес master-сервера
 MASTER_LOG_FILE="mariadb-bin.000001"  # Имя бинарного лога с мастер-сервера (взято из MASTER_STATUS)
 MASTER_LOG_POS=800          # Позиция бинарного лога (взято из MASTER_STATUS)
