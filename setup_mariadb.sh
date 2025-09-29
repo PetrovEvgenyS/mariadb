@@ -30,10 +30,6 @@ dnf install -y mariadb-server mariadb
 magentaprint "Включаем автозапуск и стартуем MariaDB"
 systemctl enable --now mariadb
 
-magentaprint "Настройка firewall, открываем 3306 порт"
-firewall-cmd --permanent --add-port=3306/tcp
-firewall-cmd --reload
-
 magentaprint "Создание директории для временных файлов"
 mkdir -p /var/lib/mysql_tmp
 chown mysql:mysql /var/lib/mysql_tmp
