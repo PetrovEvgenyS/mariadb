@@ -1,38 +1,50 @@
 #!/bin/bash
 
 # Переменные для конфигурации
-REPLICA_USER="replicator"   # Имя пользователя для репликации
-REPLICA_PASSWORD="your_password" # Пароль для пользователя репликации
-ROOT_PASSWORD="your_password"    # Пароль пользователя root
-SLAVE_IP="10.100.10.2"      # IP-адрес slave-сервера
-DATABASE="example_db"       # Имя базы данных для репликации
-MARIADB_CONF="/etc/my.cnf.d/mariadb-server.cnf" # Путь к файлу конфигурации MariaDB.
+REPLICA_USER="replicator"           # Имя пользователя для репликации
+REPLICA_PASSWORD="your_password"    # Пароль для пользователя репликации
+ROOT_PASSWORD="your_password"       # Пароль пользователя root
+SLAVE_IP="10.100.10.2"              # IP-адрес slave-сервера
+MARIADB_CONF="/etc/my.cnf.d/mariadb-server.cnf" # Путь к файлу конфигурации MariaDB. AlmaLinux
+#MARIADB_CONF="/etc/mysql/mariadb.conf.d/50-server.cnf" # Путь к файлу конфигурации MariaDB. Ubuntu
 
 # Настраиваем MariaDB как мастер
 cat <<EOF >> $MARIADB_CONF
 
-server-id = 1               # Уникальный идентификатор мастера.
+### replication
 
-log_bin = /var/lib/mysql/mariadb-bin.log  # Включает бинарные логи, необходимые для репликации.
-log_bin_index = /var/lib/mysql/mariadb-bin.index # Хранит список всех бинарных файлов, что важно для репликации и восстановления данных.
+# Уникальный идентификатор сервера.
+server-id = 1
 
-# binlog_do_db = $DATABASE  # Используется для репликации только определенных баз данных.
-binlog_ignore_db = information_schema, mysql, performance_schema # Исключает определенные базы данных из репликации (в данном примере, исключены служебных базы).
+# Включает бинарные логи, необходимые для репликации.
+log_bin = /var/lib/mysql/mariadb-bin.log
+
+# Хранит список всех бинарных файлов, что важно для репликации и восстановления данных.
+log_bin_index = /var/lib/mysql/mariadb-bin.index
+
+# Указывает, где slave будет хранить лог репликации.
+relay_log = /var/lib/mysql/relay-bin.log
+
+# Хранит список всех релей-логов, полезно для управления репликацией.
+relay_log_index = /var/lib/mysql/relay-bin.index
+
+# Исключает определенные базы данных из репликации (в данном примере, исключены служебные базы).
+binlog_ignore_db = information_schema, mysql, performance_schema
 EOF
 
 # Перезапускаем MariaDB для применения конфигурации
 systemctl restart mariadb
 
 # Создаем пользователя для репликации и предоставляем необходимые права
-mysql -u root -p$ROOT_PASSWORD -e "CREATE USER '$REPLICA_USER'@'$SLAVE_IP' IDENTIFIED BY '$REPLICA_PASSWORD';"
-mysql -u root -p$ROOT_PASSWORD -e "GRANT REPLICATION SLAVE ON *.* TO '$REPLICA_USER'@'$SLAVE_IP';"
-mysql -u root -p$ROOT_PASSWORD -e "FLUSH PRIVILEGES;"
+mariadb -u root -p$ROOT_PASSWORD -e "CREATE USER '$REPLICA_USER'@'$SLAVE_IP' IDENTIFIED BY '$REPLICA_PASSWORD';"
+mariadb -u root -p$ROOT_PASSWORD -e "GRANT REPLICATION SLAVE ON *.* TO '$REPLICA_USER'@'$SLAVE_IP';"
+mariadb -u root -p$ROOT_PASSWORD -e "FLUSH PRIVILEGES;"
 
 # Блокируем БД на запись:
-mysql -u root -p$ROOT_PASSWORD -e "SET GLOBAL read_only = ON;"
+mariadb -u root -p$ROOT_PASSWORD -e "SET GLOBAL read_only = ON;"
 
 # Отображаем текущий статус мастера, чтобы скопировать данные для настройки слейва
-MASTER_STATUS=$(mysql -u root -p$ROOT_PASSWORD -e "SHOW MASTER STATUS\G")
+MASTER_STATUS=$(mariadb -u root -p$ROOT_PASSWORD -e "SHOW MASTER STATUS\G")
 echo "Настройка завершена. Сохраните следующие данные для настройки слейва:"
 echo "$MASTER_STATUS"
 
@@ -42,11 +54,11 @@ echo "Делаем backpup БД: /tmp/master_backup.sql"
 mariadb-dump -u root -p$ROOT_PASSWORD --all-databases > /tmp/master_backup.sql
 
 # Снимаем блокировку БД на запись:
-mysql -u root -p$ROOT_PASSWORD -e "SET GLOBAL read_only = OFF;"
+mariadb -u root -p$ROOT_PASSWORD -e "SET GLOBAL read_only = OFF;"
 echo " "
 echo "Скопируйте backup БД Мастера на Slave:"
 echo "scp /tmp/master_backup.sql root@$SLAVE_IP:/tmp/"
 echo " "
 echo "Выполните команду на Slave:"
-echo "mysql -u root -p < /tmp/master_backup.sql"
+echo "mariadb -u root -p < /tmp/master_backup.sql"
 echo " "
