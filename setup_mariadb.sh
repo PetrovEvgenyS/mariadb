@@ -1,10 +1,12 @@
 #!/bin/bash
 
+set -euo pipefail
+
 # Скрипт для установки и настройки MariaDB на AlmaLinux
 ROOT_DB_PASSWORD="your_password"    # Пароль от root СУБД MariaDB.
 USER="evgen"                        # Имя пользователя, который будет создан в СУБД MariaDB.
 USER_PASSWORD="your_password"       # Пароль от $USER СУБД MariaDB.
-MARIADB_CONF="/etc/my.cnf.d/mariadb-server.cnf" # Путь к файлу конфигурации MariaDB.
+MARIADB_CONF=""                     # Путь к файлу конфигурации MariaDB будет выбран в зависимости от дистрибутива.
 
 ### ЦВЕТА ###
 ESC=$(printf '\033') RESET="${ESC}[0m" MAGENTA="${ESC}[35m" RED="${ESC}[31m" GREEN="${ESC}[32m"
@@ -24,8 +26,42 @@ if [ "$EUID" -ne 0 ]; then
     exit 1
 fi
 
+# --- Определение дистрибутива и установка пакетов ---
+if [ -f /etc/os-release ]; then
+    . /etc/os-release
+    DISTRO="$ID"
+else
+    DISTRO="unknown"
+fi
+
+case "$DISTRO" in
+  ubuntu)
+    INSTALL_CMD='apt update && apt install -y mariadb-server mariadb-client'
+    MARIADB_CONF="/etc/mysql/mariadb.conf.d/50-server.cnf"
+    SOCKET="/run/mysqld/mysqld.sock"
+    PIDFILE="/run/mysqld/mysqld.pid"
+    LOGDIR="/var/log/mysql"
+    SLOWLOG="$LOGDIR/slow.log"
+    TMPDIR="/tmp"
+    ;;
+  almalinux)
+    INSTALL_CMD='dnf install -y mariadb-server mariadb'
+    MARIADB_CONF="/etc/my.cnf.d/mariadb-server.cnf"
+    SOCKET="/var/lib/mysql/mysql.sock"
+    PIDFILE="/run/mariadb/mariadb.pid"
+    LOGDIR="/var/log/mariadb"
+    SLOWLOG="$LOGDIR/slow.log"
+    TMPDIR="/var/lib/mysql_tmp"
+    ;;
+.
+    ;;
+  *)
+    errorprint "Неподдерживаемый дистрибутив: $DISTRO"; exit 1;;
+esac
+
+
 magentaprint "Устанавливаем сервер MariaDB и клиент"
-dnf install -y mariadb-server mariadb
+/bin/sh -c "$INSTALL_CMD"
 
 magentaprint "Включаем автозапуск и стартуем MariaDB"
 systemctl enable --now mariadb
