@@ -53,6 +53,35 @@ tar -cf - full_$(date +%F) | pigz > /backups/full_$(date +%F).tar.gz
 
 ---
 
+## Полный бэкап в поток `xbstream` (сжатый в gzip)
+
+Создание:
+
+```bash
+mariadb-backup --backup \
+  --target-dir=/tmp/mariadb/ \
+  --user=mariadb-backup --password=mypassword \
+  --stream=xbstream | gzip > /tmp/mariadb-backup.xbstream.gz
+```
+
+Восстановление:
+
+```bash
+mkdir -p /backups/restore_$(date +%F)
+gzip -dc /tmp/mariadb-backup.xbstream.gz | mbstream -x -C /backups/restore_$(date +%F)
+
+# -d — распаковать
+# -c — писать в stdout
+
+mariadb-backup --prepare --target-dir=/backups/restore_$(date +%F)
+
+systemctl stop mariadb
+rm -rf /var/lib/mysql/*
+mariadb-backup --copy-back --target-dir=/backups/restore_$(date +%F)
+chown -R mysql:mysql /var/lib/mysql
+systemctl start mariadb
+```
+
 ## Инкрементальный бэкап
 
 ```bash
@@ -98,6 +127,8 @@ mariadb-backup --prepare \
 ```bash
 systemctl stop mariadb
 
+rm -rf /var/lib/mysql/*
+
 mariadb-backup --copy-back \
     --target-dir=/backups/full_2025-08-09
 
@@ -106,8 +137,8 @@ chown -R mysql:mysql /var/lib/mysql
 systemctl start mariadb
 ```
 
-- `--copy-back` — копирует файлы из бэкапа в директорию MariaDB.
-- После копирования обязательно выставить правильные права на файлы.
+- `--copy-back` — копирует файлы из бэкапа в директорию MariaDB. Исходный бэкап остаётся на месте, его можно использовать повторно.
+- `--move-back` — перемещает файлы (аналог копирования с последующим удалением из `--target-dir`). Быстрее и экономит место на диске, но каталог бэкапа после восстановления опустеет.
 
 ---
 
