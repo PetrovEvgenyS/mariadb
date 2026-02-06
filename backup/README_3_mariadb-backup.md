@@ -1,8 +1,8 @@
-# Работа с mariabackup
+# Работа с mariadb-backup
 
 [Назад к главному README](README.md)
 
-**mariabackup** — это официальный инструмент MariaDB для **физического резервного копирования**. Он позволяет быстро создавать полные и инкрементальные бэкапы без остановки сервера.
+**mariadb-backup** — это официальный инструмент MariaDB для **физического резервного копирования**. Он позволяет быстро создавать полные и инкрементальные бэкапы без остановки сервера.
 
 ---
 
@@ -13,7 +13,7 @@
 - `Поддержка горячего бэкапа` — можно снимать бэкап без остановки сервера.
 - `Быстрое восстановление` — не нужно импортировать дамп, достаточно вернуть файлы на место.
 
-## Когда лучше использовать mariabackup
+## Когда лучше использовать mariadb-backup
 - Очень большие базы данных (десятки/сотни ГБ и более).
 - Частые резервные копии (ежедневно или чаще).
 - Необходимость минимальной нагрузки на сервер во время бэкапа.
@@ -40,7 +40,7 @@ chmod 600 /etc/my.cnf.d/client.cnf
 ## Полный бэкап
 
 ```bash
-mariabackup --defaults-file=/etc/my.cnf.d/client.cnf \
+mariadb-backup --defaults-file=/etc/my.cnf.d/client.cnf \
     --backup \
     --target-dir=/backups/full_$(date +%F)
 
@@ -56,7 +56,7 @@ tar -cf - full_$(date +%F) | pigz > /backups/full_$(date +%F).tar.gz
 ## Инкрементальный бэкап
 
 ```bash
-mariabackup --defaults-file=/etc/my.cnf.d/client.cnf \
+mariadb-backup --defaults-file=/etc/my.cnf.d/client.cnf \
     --backup \
     --target-dir=/backups/inc_$(date +%F) \
     --incremental-basedir=/backups/full_2025-08-09
@@ -79,14 +79,14 @@ tar -xf /backups/full_2025-08-09.tar.gz -C /backups/
 Перед восстановлением нужно «применить» журналы транзакций, чтобы база стала консистентной:
 
 ```bash
-mariabackup --prepare \
+mariadb-backup --prepare \
     --target-dir=/backups/full_2025-08-09
 ```
 
 Если есть инкрементальные копии, их нужно последовательно применить:
 
 ```bash
-mariabackup --prepare \
+mariadb-backup --prepare \
     --target-dir=/backups/full_2025-08-09 \
     --incremental-dir=/backups/inc_2025-08-10
 ```
@@ -98,7 +98,7 @@ mariabackup --prepare \
 ```bash
 systemctl stop mariadb
 
-mariabackup --copy-back \
+mariadb-backup --copy-back \
     --target-dir=/backups/full_2025-08-09
 
 chown -R mysql:mysql /var/lib/mysql
@@ -111,9 +111,9 @@ systemctl start mariadb
 
 ---
 
-## Сравнение `mariadb-dump` и `mariabackup`
+## Сравнение `mariadb-dump` и `mariadb-backup`
 
-| Характеристика            | mariadb-dump                          | mariabackup                   |
+| Характеристика            | mariadb-dump                          | mariadb-backup                   |
 |---------------------------|---------------------------------------|-------------------------------|
 | Тип бэкапа                | Логический (SQL)                      | Физический (файлы)            |
 | Универсальность           | Высокая (разные версии, миграции)     | Низкая (только та же версия)  |
